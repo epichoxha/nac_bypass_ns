@@ -1,10 +1,10 @@
-Este repositorio extiende el **NAC Bypass** de [scipag](https://github.com/scipag/nac_bypass) sin modificar su funcionamiento original. Mantiene flags, dependencias y flujo intactos, permitiendo una integración directa.
+This repository extends the **NAC Bypass** from [scipag](https://github.com/scipag/nac_bypass) without modifying its original functionality. It maintains flags, dependencies, and flow intact, allowing for direct integration.
 
-## Mejoras clave
+## Key improvements
 
-* **Monitoreo EAPOL en tiempo real:** durante la `fase_inicial`, se ejecuta `tcpdump` para capturar tráfico 802.1X y analizar la autenticación antes de proceder.
-* **Namespace aislado (`bypass`):** el script `nac_bypass_setup_ns.sh` crea una interfaz `macvlan` dentro de un namespace, bloqueando el acceso desde el host al bridge (`br0`). Todo el tráfico del bypass queda contenido, evitando fugas de la MAC del atacante.
-* **Prevención de cierre de puerto en el switch:** encapsular la MAC/IP legítima dentro del namespace y bloquear el acceso al bridge evita que el switch detecte actividad anómala, previniendo errores como `security-violation` o que el puerto entre en estado `err-disable`.
-* **Limpieza completa (`-r`):** elimina bridge, reglas, namespace y configuraciones residuales, dejando el sistema limpio para nuevos intentos.
+* **Real-time EAPOL monitoring:** during the `initial_phase`, `tcpdump` is executed to capture 802.1X traffic and analyze authentication before proceeding.
+* **Isolated namespace (`bypass`):** the `nac_bypass_setup_ns.sh` script creates a `macvlan` interface inside a namespace, blocking host access to the bridge (`br0`). All bypass traffic is contained, preventing attacker MAC leakage.
+* **Switch port shutdown prevention:** encapsulating the legitimate MAC/IP within the namespace and blocking bridge access prevents the switch from detecting anomalous activity, preventing errors like `security-violation` or the port entering `err-disable` state.
+* **Complete cleanup (`-r`):** removes bridge, rules, namespace, and residual configurations, leaving the system clean for new attempts.
 
-**Resumen:** respeta la lógica original de scipag, pero añade aislamiento de red, prevención de fugas de MAC y una rutina de limpieza. Ideal para evasión de NAC sigilosa y reutilizable en ejercicios de Red Team.
+**Summary:** respects scipag's original logic, but adds network isolation, MAC leakage prevention, and a cleanup routine. Ideal for stealthy NAC evasion and reusable in Red Team exercises.
