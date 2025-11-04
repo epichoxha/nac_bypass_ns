@@ -2,14 +2,14 @@
 
 # -----------------------------------------------------------------------------
 # Script: prerequisitos.sh
-# Función: automatiza la preparación del entorno para usar el bypass NAC.
-#   - Comprueba paquetes base y los instala si faltan.
-#   - Verifica que el módulo de kernel br_netfilter esté cargado y persistente.
-#   - Muestra las interfaces de red disponibles con sugerencias de uso.
-#   - Revisa que los scripts principales existan y tengan permisos de ejecución.
-#   - Valida que estén disponibles las herramientas esenciales (apt-get, modprobe, ip, etc.).
-#   - Comprueba datos básicos del sistema (distribución, número de interfaces útiles, etc.).
-#   - DETECTA Y ELIMINA AVAHI (mDNS/ZeroConf) si está instalado/activo.
+# Function: automates environment preparation for using the NAC bypass.
+#   - Checks base packages and installs them if missing.
+#   - Verifies that the br_netfilter kernel module is loaded and persistent.
+#   - Shows available network interfaces with usage suggestions.
+#   - Checks that main scripts exist and have execution permissions.
+#   - Validates that essential tools are available (apt-get, modprobe, ip, etc.).
+#   - Checks basic system data (distribution, number of useful interfaces, etc.).
+#   - DETECTS AND REMOVES AVAHI (mDNS/ZeroConf) if installed/active.
 # -----------------------------------------------------------------------------
 
 set -euo pipefail
@@ -59,7 +59,7 @@ COLOR_RESET="\e[0m"
 
 requerir_root() {
   if [ "${EUID}" -ne 0 ]; then
-    echo -e "${COLOR_WARN}[!] Ejecuta este script como root (usa sudo).${COLOR_RESET}"
+    echo -e "${COLOR_WARN}[!] Run this script as root (use sudo).${COLOR_RESET}"
     exit 1
   fi
 }
@@ -77,96 +77,96 @@ warn() {
 }
 
 verificar_os() {
-  info "Comprobando información del sistema..."
+  info "Checking system information..."
 
   if [ -f /etc/os-release ]; then
     # shellcheck disable=SC1091
     . /etc/os-release
-    local nombre="${NAME:-Desconocido}"
+    local nombre="${NAME:-Unknown}"
     local version="${VERSION_ID:-}"
-    info "Sistema detectado: ${nombre} ${version}"
+    info "Detected system: ${nombre} ${version}"
 
     local base="${ID_LIKE:-$ID}"
     if [[ "${base,,}" != *"debian"* && "${ID,,}" != "debian" && "${ID,,}" != "ubuntu" ]]; then
-      warn "Este script se probó en sistemas tipo Debian/Ubuntu; revisa comandos manualmente si usas otra distribución."
+      warn "This script was tested on Debian/Ubuntu-like systems; check commands manually if using another distribution."
     fi
   else
-    warn "No se encontró /etc/os-release. No se pudo identificar la distribución."
+    warn "/etc/os-release not found. Could not identify distribution."
   fi
 }
 
 verificar_comandos_base() {
-  info "Comprobando comandos básicos disponibles en el sistema..."
+  info "Checking basic commands available in the system..."
   local faltan=()
 
   for cmd in "${COMANDOS_BASE[@]}"; do
     if command -v "$cmd" >/dev/null 2>&1; then
-      ok "Comando encontrado: $cmd"
+      ok "Command found: $cmd"
     else
-      warn "No se encontró el comando: $cmd"
+      warn "Command not found: $cmd"
       faltan+=("$cmd")
     fi
   done
 
   if [ "${#faltan[@]}" -gt 0 ]; then
-    warn "Faltan comandos básicos: ${faltan[*]}."
-    warn "Instala los paquetes necesarios o ajusta el PATH antes de continuar."
+    warn "Missing basic commands: ${faltan[*]}."
+    warn "Install necessary packages or adjust PATH before continuing."
   fi
 }
 
 instalar_paquetes() {
-  info "Verificando paquetes necesarios..."
+  info "Verifying necessary packages..."
   local faltan=()
 
   for pkg in "${PAQUETES[@]}"; do
     if dpkg -s "$pkg" >/dev/null 2>&1; then
-      ok "Paquete presente: $pkg"
+      ok "Package present: $pkg"
     else
-      warn "Falta el paquete: $pkg"
+      warn "Missing package: $pkg"
       faltan+=("$pkg")
     fi
   done
 
   if [ "${#faltan[@]}" -gt 0 ]; then
     if command -v apt-get >/dev/null 2>&1; then
-      info "Instalando paquetes faltantes: ${faltan[*]}"
+      info "Installing missing packages: ${faltan[*]}"
       apt-get update
       apt-get install -y "${faltan[@]}"
     else
-      warn "apt-get no está disponible. Instala manualmente: ${faltan[*]}"
+      warn "apt-get not available. Install manually: ${faltan[*]}"
     fi
   else
-    info "No hay paquetes pendientes."
+    info "No pending packages."
   fi
 }
 
 asegurar_modulo() {
   local modulo="br_netfilter"
-  info "Comprobando módulo de kernel $modulo..."
+  info "Checking kernel module $modulo..."
 
   if lsmod | grep -qw "$modulo"; then
-    ok "El módulo $modulo ya está cargado."
+    ok "Module $modulo already loaded."
   else
-    warn "El módulo $modulo no está cargado. Intentando cargarlo."
+    warn "Module $modulo not loaded. Attempting to load it."
     modprobe "$modulo"
-    ok "Módulo $modulo cargado con éxito."
+    ok "Module $modulo loaded successfully."
   fi
 
   local modules_file="/etc/modules"
   if grep -E "^${modulo}$" "$modules_file" >/dev/null 2>&1; then
-    info "El módulo $modulo ya está configurado para cargarse al iniciar."
+    info "Module $modulo already configured to load at boot."
   else
-    info "Añadiendo $modulo a $modules_file para cargarlo en cada arranque."
+    info "Adding $modulo to $modules_file to load on each boot."
     echo "$modulo" >> "$modules_file"
-    ok "Módulo $modulo persistente configurado."
+    ok "Persistent module $modulo configured."
   fi
 }
 
 detectar_interfaces() {
-  info "Detectando interfaces de red disponibles..."
+  info "Detecting available network interfaces..."
 
   if ! command -v ip >/dev/null 2>&1; then
-    warn "El comando 'ip' no está disponible; no se pueden listar interfaces."
+    warn "Command 'ip' not available; cannot list interfaces."
     return
   fi
 
@@ -174,12 +174,12 @@ detectar_interfaces() {
   interfaces=$(ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$')
 
   if [ -z "$interfaces" ]; then
-    warn "No se encontraron interfaces de red distintas de lo."
+    warn "No network interfaces found other than lo."
     return
   fi
 
   echo ""
-  echo "Interfaces detectadas:"
+  echo "Detected interfaces:"
   local contador=1
   local total=0
   local recommended_switch=""
@@ -192,19 +192,19 @@ detectar_interfaces() {
     detalle=$(ip -o -4 addr show "$iface" | awk '{print $4}' || true)
 
     local carrier_val=""
-    local carrier_text="estado de link desconocido"
+    local carrier_text="link status unknown"
     if [ -f "/sys/class/net/$iface/carrier" ]; then
       carrier_val=$(cat "/sys/class/net/$iface/carrier" 2>/dev/null || echo "")
       if [ "$carrier_val" = "1" ]; then
-        carrier_text="link activo"
+        carrier_text="link active"
       elif [ "$carrier_val" = "0" ]; then
-        carrier_text="sin link"
+        carrier_text="no link"
       fi
     fi
 
-    local tipo="cableada"
+    local tipo="wired"
     if [[ "$iface" == wl* || "$iface" == wifi* ]]; then
-      tipo="inalámbrica"
+      tipo="wireless"
       wifi_present=1
     fi
 
@@ -212,12 +212,12 @@ detectar_interfaces() {
     if [ -n "$detalle" ]; then
       linea="$linea, IPs: $detalle"
     else
-      linea="$linea, sin IP asignada ahora mismo"
+      linea="$linea, no IP assigned currently"
     fi
 
     resumenes+=("$linea")
 
-    if [ "$tipo" = "cableada" ]; then
+    if [ "$tipo" = "wired" ]; then
       if [ "$carrier_val" = "1" ] && [ -z "$recommended_switch" ]; then
         recommended_switch="$iface"
       fi
@@ -235,64 +235,64 @@ detectar_interfaces() {
   done
 
   if [ "$total" -lt 2 ]; then
-    warn "Se detectaron solo $total interfaz(es) útil(es). El bypass requiere al menos dos (switch y víctima)."
+    warn "Only $total useful interface(s) detected. Bypass requires at least two (switch and victim)."
   else
-    info "Total de interfaces útiles detectadas: $total"
+    info "Total useful interfaces detected: $total"
   fi
 
   echo ""
-  echo "Sugerencias automáticas:"
+  echo "Automatic suggestions:"
   if [ -n "$recommended_switch" ]; then
-    echo "  - Lado switch sugerido: $recommended_switch (cableada, link activo)."
+    echo "  - Suggested switch side: $recommended_switch (wired, active link)."
   else
-    echo "  - Lado switch sugerido: conecta un cable y vuelve a ejecutar el script; no se detectó interfaz cableada con link activo."
+    echo "  - Suggested switch side: connect a cable and run script again; no wired interface with active link detected."
   fi
 
   if [ -n "$recommended_victim" ]; then
-    echo "  - Lado víctima sugerido: $recommended_victim (cableada sin IP asignada, ideal para la máquina víctima)."
+    echo "  - Suggested victim side: $recommended_victim (wired without IP assigned, ideal for victim machine)."
   else
-    echo "  - Lado víctima sugerido: usa una interfaz cableada sin IP (por ejemplo, desconecta y reintenta con otra NIC)."
+    echo "  - Suggested victim side: use a wired interface without IP (for example, disconnect and retry with another NIC)."
   fi
 
   if [ "$wifi_present" -eq 1 ]; then
-    echo "  - Se detectó al menos una interfaz inalámbrica; evita usarla para el puente, necesita interfaces Ethernet."
+    echo "  - At least one wireless interface detected; avoid using it for bridging, requires Ethernet interfaces."
   fi
 
-  echo "  - Si tienes dudas, ejecuta 'sudo ethtool <interfaz>' para comprobar el estado del enlace."
+  echo "  - If in doubt, run 'sudo ethtool <interface>' to check link status."
 }
 
 preparar_scripts() {
-  info "Revisando scripts principales en el directorio actual..."
+  info "Checking main scripts in current directory..."
   local faltantes=()
 
   for script in "${ARCHIVOS_SCRIPT[@]}"; do
     if [ -f "$script" ]; then
-      ok "Encontrado: $script"
+      ok "Found: $script"
       if [ ! -x "$script" ]; then
-        info "Asignando permisos de ejecución a $script"
+        info "Assigning execution permissions to $script"
         chmod +x "$script"
-        ok "Permisos de ejecución aplicados a $script"
+        ok "Execution permissions applied to $script"
       else
-        info "$script ya tiene permisos de ejecución."
+        info "$script already has execution permissions."
       fi
     else
-      warn "No se encontró el archivo $script en $(pwd)."
+      warn "File $script not found in $(pwd)."
       faltantes+=("$script")
     fi
   done
 
   if [ "${#faltantes[@]}" -gt 0 ]; then
-    warn "Copia los archivos faltantes antes de continuar: ${faltantes[*]}"
+    warn "Copy missing files before continuing: ${faltantes[*]}"
   fi
 }
 
 revisar_servicios_interferentes() {
   if ! command -v systemctl >/dev/null 2>&1; then
-    warn "systemctl no está disponible; no se puede verificar el estado de servicios de red."
+    warn "systemctl not available; cannot check network service status."
     return
   fi
 
-  info "Revisando servicios de red que podrían interferir con la configuración manual..."
+  info "Checking network services that could interfere with manual configuration..."
   local detectados=0
 
   for svc in "${SERVICIOS_RED[@]}"; do
@@ -301,33 +301,33 @@ revisar_servicios_interferentes() {
       local habilitado=$(systemctl is-enabled "$svc" 2>/dev/null || true)
 
       if [ "$estado" = "active" ]; then
-        warn "Servicio activo detectado: $svc (se detendrá durante el bypass)."
+        warn "Active service detected: $svc (will be stopped during bypass)."
         detectados=1
       fi
 
       if [ "$habilitado" = "enabled" ]; then
-        info "El servicio $svc está habilitado. Considera deshabilitarlo si deseas un entorno más estático."
+        info "Service $svc is enabled. Consider disabling it if you want a more static environment."
       fi
     fi
   done
 
   if [ "$detectados" -eq 0 ]; then
-    info "No se detectaron servicios de red activos que interfieran de inmediato."
+    info "No active network services detected that interfere immediately."
   fi
 }
 
 # ---------------------------
-# Nueva función: disable_avahi
-# - Para/disable/mask Avahi si está activo
-# - Intenta desinstalar paquetes avahi-daemon y avahi-utils vía apt-get si está disponible
-# - Comprueba si el puerto mDNS (UDP 5353) queda libre después
+# New function: disable_avahi
+# - Stops/disables/masks Avahi if active
+# - Attempts to uninstall avahi-daemon and avahi-utils packages via apt-get if available
+# - Checks if mDNS port (UDP 5353) remains free afterwards
 # ---------------------------
 disable_avahi() {
-  info "Comprobando presencia de Avahi (mDNS/ZeroConf)..."
+  info "Checking for Avahi (mDNS/ZeroConf) presence..."
 
-  # Necesitamos systemctl y dpkg para verificar estado/instalación
+  # We need systemctl and dpkg to verify status/installation
   if ! command -v systemctl >/dev/null 2>&1; then
-    warn "systemctl no disponible: solo se hará una comprobación mediante dpkg/ps/ss."
+    warn "systemctl not available: only performing check via dpkg/ps/ss."
   fi
 
   local instalado=0
@@ -336,48 +336,48 @@ disable_avahi() {
   fi
 
   if [ "$instalado" -eq 0 ]; then
-    info "Avahi no parece estar instalado (no se encontraron paquetes avahi-daemon/avahi-utils)."
+    info "Avahi doesn't seem to be installed (no avahi-daemon/avahi-utils packages found)."
   else
-    info "Avahi detectado: procederemos a detener, deshabilitar, enmascarar y (opcionalmente) desinstalar."
-    # detener y deshabilitar (si systemctl disponible)
+    info "Avahi detected: proceeding to stop, disable, mask and (optionally) uninstall."
+    # stop and disable (if systemctl available)
     if command -v systemctl >/dev/null 2>&1; then
-      info "Parando avahi (systemctl)..."
+      info "Stopping avahi (systemctl)..."
       systemctl stop avahi-daemon.service avahi-daemon.socket >/dev/null 2>&1 || true
-      info "Deshabilitando avahi para arranque futuro..."
+      info "Disabling avahi for future boot..."
       systemctl disable avahi-daemon.service avahi-daemon.socket >/dev/null 2>&1 || true
-      info "Enmascarando avahi para evitar reactivaciones..."
+      info "Masking avahi to prevent reactivations..."
       systemctl mask avahi-daemon.service avahi-daemon.socket >/dev/null 2>&1 || true
     else
-      info "systemctl no disponible; intentaremos finalizar procesos manualmente."
+      info "systemctl not available; attempting to kill processes manually."
       pkill -f avahi-daemon || true
     fi
 
-    # intento de desinstalación vía apt-get si existe
+    # attempt uninstallation via apt-get if exists
     if command -v apt-get >/dev/null 2>&1; then
-      info "Desinstalando paquetes avahi (apt-get)..."
+      info "Uninstalling avahi packages (apt-get)..."
       apt-get update
-      apt-get remove --purge -y avahi-daemon avahi-utils || warn "Fallo al eliminar paquetes avahi con apt-get."
+      apt-get remove --purge -y avahi-daemon avahi-utils || warn "Failed to remove avahi packages with apt-get."
       apt-get autoremove --purge -y || true
-      ok "Comando de desinstalación ejecutado (si los paquetes estaban presentes)."
+      ok "Uninstall command executed (if packages were present)."
     else
-      warn "apt-get no está disponible: avahi desactivado pero no desinstalado."
+      warn "apt-get not available: avahi disabled but not uninstalled."
     fi
   fi
 
-  # comprobaciones finales: procesos y puerto UDP 5353
+  # final checks: processes and UDP port 5353
   if pgrep -af avahi-daemon >/dev/null 2>&1; then
-    warn "Se detectan procesos avahi-daemon aún activos. Intentando finalizarlos..."
+    warn "avahi-daemon processes still active detected. Attempting to terminate..."
     pkill -f avahi-daemon || true
   fi
 
   if command -v ss >/dev/null 2>&1; then
     if ss -lunp 2>/dev/null | grep -q ":5353"; then
-      warn "Puerto UDP 5353 (mDNS) sigue en uso. Revisa procesos activos manualmente."
+      warn "UDP port 5353 (mDNS) still in use. Check active processes manually."
     else
-      ok "Puerto UDP 5353 no detectado: mDNS parece inactivo."
+      ok "UDP port 5353 not detected: mDNS appears inactive."
     fi
   else
-    info "No se puede comprobar puerto 5353: 'ss' no disponible."
+    info "Cannot check port 5353: 'ss' not available."
   fi
 }
 
@@ -391,10 +391,10 @@ main() {
   preparar_scripts
   revisar_servicios_interferentes
 
-  # Llamada añadida: detectar y eliminar Avahi si existe
+  # Added call: detect and remove Avahi if exists
   disable_avahi
 
-  ok "Listo. Ya tienes el entorno preparado para lanzar los scripts del bypass."
+  ok "Ready. Environment is now prepared to run bypass scripts."
 }
 
 main "$@"
