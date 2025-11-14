@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-PAQUETES=(
+PACKAGES=(
   bridge-utils
   ethtool
   macchanger
@@ -25,12 +25,12 @@ PAQUETES=(
   tcpdump
 )
 
-ARCHIVOS_SCRIPT=(
+SCRIPT_FILES=(
   "nac_bypass_setup.sh"
   "awareness.sh"
 )
 
-COMANDOS_BASE=(
+BASE_COMMANDS=(
   "apt-get"
   "modprobe"
   "ip"
@@ -46,7 +46,7 @@ COMANDOS_BASE=(
   "ethtool"
 )
 
-SERVICIOS_RED=(
+NETWORK_SERVICES=(
   "NetworkManager.service"
   "network-manager.service"
   "systemd-networkd.service"
@@ -57,7 +57,7 @@ COLOR_OK="\e[1;32m"
 COLOR_WARN="\e[1;31m"
 COLOR_RESET="\e[0m"
 
-requerir_root() {
+require_root() {
   if [ "${EUID}" -ne 0 ]; then
     echo -e "${COLOR_WARN}[!] Run this script as root (use sudo).${COLOR_RESET}"
     exit 1
@@ -76,15 +76,15 @@ warn() {
   echo -e "${COLOR_WARN}[!] $1${COLOR_RESET}"
 }
 
-verificar_os() {
+verify_os() {
   info "Checking system information..."
 
   if [ -f /etc/os-release ]; then
     # shellcheck disable=SC1091
     . /etc/os-release
-    local nombre="${NAME:-Unknown}"
+    local name="${NAME:-Unknown}"
     local version="${VERSION_ID:-}"
-    info "Detected system: ${nombre} ${version}"
+    info "Detected system: ${name} ${version}"
 
     local base="${ID_LIKE:-$ID}"
     if [[ "${base,,}" != *"debian"* && "${ID,,}" != "debian" && "${ID,,}" != "ubuntu" ]]; then
@@ -95,74 +95,74 @@ verificar_os() {
   fi
 }
 
-verificar_comandos_base() {
+verify_base_commands() {
   info "Checking basic commands available in the system..."
-  local faltan=()
+  local missing=()
 
-  for cmd in "${COMANDOS_BASE[@]}"; do
+  for cmd in "${BASE_COMMANDS[@]}"; do
     if command -v "$cmd" >/dev/null 2>&1; then
       ok "Command found: $cmd"
     else
       warn "Command not found: $cmd"
-      faltan+=("$cmd")
+      missing+=("$cmd")
     fi
   done
 
-  if [ "${#faltan[@]}" -gt 0 ]; then
-    warn "Missing basic commands: ${faltan[*]}."
+  if [ "${#missing[@]}" -gt 0 ]; then
+    warn "Missing basic commands: ${missing[*]}."
     warn "Install necessary packages or adjust PATH before continuing."
   fi
 }
 
-instalar_paquetes() {
+install_packages() {
   info "Verifying necessary packages..."
-  local faltan=()
+  local missing=()
 
-  for pkg in "${PAQUETES[@]}"; do
+  for pkg in "${PACKAGES[@]}"; do
     if dpkg -s "$pkg" >/dev/null 2>&1; then
       ok "Package present: $pkg"
     else
       warn "Missing package: $pkg"
-      faltan+=("$pkg")
+      missing+=("$pkg")
     fi
   done
 
-  if [ "${#faltan[@]}" -gt 0 ]; then
+  if [ "${#missing[@]}" -gt 0 ]; then
     if command -v apt-get >/dev/null 2>&1; then
-      info "Installing missing packages: ${faltan[*]}"
+      info "Installing missing packages: ${missing[*]}"
       apt-get update
-      apt-get install -y "${faltan[@]}"
+      apt-get install -y "${missing[@]}"
     else
-      warn "apt-get not available. Install manually: ${faltan[*]}"
+      warn "apt-get not available. Install manually: ${missing[*]}"
     fi
   else
     info "No pending packages."
   fi
 }
 
-asegurar_modulo() {
-  local modulo="br_netfilter"
-  info "Checking kernel module $modulo..."
+ensure_module() {
+  local module="br_netfilter"
+  info "Checking kernel module $module..."
 
-  if lsmod | grep -qw "$modulo"; then
-    ok "Module $modulo already loaded."
+  if lsmod | grep -qw "$module"; then
+    ok "Module $module already loaded."
   else
-    warn "Module $modulo not loaded. Attempting to load it."
-    modprobe "$modulo"
-    ok "Module $modulo loaded successfully."
+    warn "Module $module not loaded. Attempting to load it."
+    modprobe "$module"
+    ok "Module $module loaded successfully."
   fi
 
   local modules_file="/etc/modules"
-  if grep -E "^${modulo}$" "$modules_file" >/dev/null 2>&1; then
-    info "Module $modulo already configured to load at boot."
+  if grep -E "^${module}$" "$modules_file" >/dev/null 2>&1; then
+    info "Module $module already configured to load at boot."
   else
-    info "Adding $modulo to $modules_file to load on each boot."
-    echo "$modulo" >> "$modules_file"
-    ok "Persistent module $modulo configured."
+    info "Adding $module to $modules_file to load on each boot."
+    echo "$module" >> "$modules_file"
+    ok "Persistent module $module configured."
   fi
 }
 
-detectar_interfaces() {
+detect_interfaces() {
   info "Detecting available network interfaces..."
 
   if ! command -v ip >/dev/null 2>&1; then
@@ -180,16 +180,16 @@ detectar_interfaces() {
 
   echo ""
   echo "Detected interfaces:"
-  local contador=1
+  local counter=1
   local total=0
   local recommended_switch=""
   local recommended_victim=""
   local wifi_present=0
-  local -a resumenes=()
+  local -a summaries=()
 
   while IFS= read -r iface; do
-    local detalle
-    detalle=$(ip -o -4 addr show "$iface" | awk '{print $4}' || true)
+    local detail
+    detail=$(ip -o -4 addr show "$iface" | awk '{print $4}' || true)
 
     local carrier_val=""
     local carrier_text="link status unknown"
@@ -202,36 +202,36 @@ detectar_interfaces() {
       fi
     fi
 
-    local tipo="wired"
+    local type="wired"
     if [[ "$iface" == wl* || "$iface" == wifi* ]]; then
-      tipo="wireless"
+      type="wireless"
       wifi_present=1
     fi
 
-    local linea="  $contador) $iface -> ${tipo}, ${carrier_text}"
-    if [ -n "$detalle" ]; then
-      linea="$linea, IPs: $detalle"
+    local line="  $counter) $iface -> ${type}, ${carrier_text}"
+    if [ -n "$detail" ]; then
+      line="$line, IPs: $detail"
     else
-      linea="$linea, no IP assigned currently"
+      line="$line, no IP assigned currently"
     fi
 
-    resumenes+=("$linea")
+    summaries+=("$line")
 
-    if [ "$tipo" = "wired" ]; then
+    if [ "$type" = "wired" ]; then
       if [ "$carrier_val" = "1" ] && [ -z "$recommended_switch" ]; then
         recommended_switch="$iface"
       fi
-      if [ -z "$detalle" ] && [ "$carrier_val" != "1" ] && [ -z "$recommended_victim" ]; then
+      if [ -z "$detail" ] && [ "$carrier_val" != "1" ] && [ -z "$recommended_victim" ]; then
         recommended_victim="$iface"
       fi
     fi
 
-    contador=$((contador + 1))
+    counter=$((counter + 1))
     total=$((total + 1))
   done <<< "$interfaces"
 
-  for linea in "${resumenes[@]}"; do
-    echo "$linea"
+  for line in "${summaries[@]}"; do
+    echo "$line"
   done
 
   if [ "$total" -lt 2 ]; then
@@ -261,11 +261,11 @@ detectar_interfaces() {
   echo "  - If in doubt, run 'sudo ethtool <interface>' to check link status."
 }
 
-preparar_scripts() {
+prepare_scripts() {
   info "Checking main scripts in current directory..."
-  local faltantes=()
+  local missing=()
 
-  for script in "${ARCHIVOS_SCRIPT[@]}"; do
+  for script in "${SCRIPT_FILES[@]}"; do
     if [ -f "$script" ]; then
       ok "Found: $script"
       if [ ! -x "$script" ]; then
@@ -277,41 +277,41 @@ preparar_scripts() {
       fi
     else
       warn "File $script not found in $(pwd)."
-      faltantes+=("$script")
+      missing+=("$script")
     fi
   done
 
-  if [ "${#faltantes[@]}" -gt 0 ]; then
-    warn "Copy missing files before continuing: ${faltantes[*]}"
+  if [ "${#missing[@]}" -gt 0 ]; then
+    warn "Copy missing files before continuing: ${missing[*]}"
   fi
 }
 
-revisar_servicios_interferentes() {
+check_interfering_services() {
   if ! command -v systemctl >/dev/null 2>&1; then
     warn "systemctl not available; cannot check network service status."
     return
   fi
 
   info "Checking network services that could interfere with manual configuration..."
-  local detectados=0
+  local detected=0
 
-  for svc in "${SERVICIOS_RED[@]}"; do
+  for svc in "${NETWORK_SERVICES[@]}"; do
     if systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}' | grep -Fxq "$svc"; then
-      local estado=$(systemctl is-active "$svc" 2>/dev/null || true)
-      local habilitado=$(systemctl is-enabled "$svc" 2>/dev/null || true)
+      local state=$(systemctl is-active "$svc" 2>/dev/null || true)
+      local enabled=$(systemctl is-enabled "$svc" 2>/dev/null || true)
 
-      if [ "$estado" = "active" ]; then
+      if [ "$state" = "active" ]; then
         warn "Active service detected: $svc (will be stopped during bypass)."
-        detectados=1
+        detected=1
       fi
 
-      if [ "$habilitado" = "enabled" ]; then
+      if [ "$enabled" = "enabled" ]; then
         info "Service $svc is enabled. Consider disabling it if you want a more static environment."
       fi
     fi
   done
 
-  if [ "$detectados" -eq 0 ]; then
+  if [ "$detected" -eq 0 ]; then
     info "No active network services detected that interfere immediately."
   fi
 }
@@ -330,12 +330,12 @@ disable_avahi() {
     warn "systemctl not available: only performing check via dpkg/ps/ss."
   fi
 
-  local instalado=0
+  local installed=0
   if dpkg -s avahi-daemon >/dev/null 2>&1 || dpkg -s avahi-utils >/dev/null 2>&1; then
-    instalado=1
+    installed=1
   fi
 
-  if [ "$instalado" -eq 0 ]; then
+  if [ "$installed" -eq 0 ]; then
     info "Avahi doesn't seem to be installed (no avahi-daemon/avahi-utils packages found)."
   else
     info "Avahi detected: proceeding to stop, disable, mask and (optionally) uninstall."
@@ -382,14 +382,14 @@ disable_avahi() {
 }
 
 main() {
-  requerir_root
-  verificar_os
-  verificar_comandos_base
-  instalar_paquetes
-  asegurar_modulo
-  detectar_interfaces
-  preparar_scripts
-  revisar_servicios_interferentes
+  require_root
+  verify_os
+  verify_base_commands
+  install_packages
+  ensure_module
+  detect_interfaces
+  prepare_scripts
+  check_interfering_services
 
   # Added call: detect and remove Avahi if exists
   disable_avahi
